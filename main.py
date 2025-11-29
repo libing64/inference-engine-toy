@@ -21,6 +21,34 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from model_viewer import ModelViewer
 from inference_engine import InferenceEngine
 
+# 导入示例模型类
+try:
+    from examples import SimpleCNN, SimpleMLP, SimpleResNet
+except ImportError:
+    # 如果导入失败，定义一个简单的模型类
+    class SimpleCNN(nn.Module):
+        def __init__(self, num_classes=10):
+            super().__init__()
+            self.features = nn.Sequential(
+                nn.Conv2d(3, 32, 3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(2),
+                nn.Conv2d(32, 64, 3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(2),
+            )
+            self.classifier = nn.Sequential(
+                nn.Dropout(),
+                nn.Linear(64 * 8 * 8, 128),
+                nn.ReLU(),
+                nn.Linear(128, num_classes)
+            )
+        
+        def forward(self, x):
+            x = self.features(x)
+            x = torch.flatten(x, 1)
+            return self.classifier(x)
+
 
 class ModelAnalyzer:
     """模型分析器 - 整合查看器和推理引擎"""

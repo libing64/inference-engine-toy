@@ -34,6 +34,8 @@
 
 ```bash
 # 使用Python 3安装依赖
+conda create -n inference-engine-toy python=3.8
+conda activate inference-engine-toy
 pip3 install -r requirements.txt
 
 # 或者使用用户模式安装
