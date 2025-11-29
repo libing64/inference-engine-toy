@@ -115,11 +115,21 @@ def main():
                         df = df.rename(columns={
                             'name': '层名称',
                             'type': '类型',
+                            'kernel_size': 'Kernel',
+                            'stride': 'Stride',
+                            'padding': 'Padding',
                             'input_shape': '输入形状',
                             'output_shape': '输出形状',
                             'params': '参数数量',
                             'trainable_params': '可训练参数'
                         })
+                        
+                        # 调整列顺序
+                        cols = ['层名称', '类型', 'Kernel', 'Stride', 'Padding', '输入形状', '输出形状', '参数数量']
+                        # 确保列存在（防止旧数据报错）
+                        cols = [c for c in cols if c in df.columns]
+                        df = df[cols]
+                        
                         st.dataframe(df, use_container_width=True)
                     else:
                         st.warning("暂无层信息")

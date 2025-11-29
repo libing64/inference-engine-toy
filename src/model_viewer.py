@@ -96,7 +96,10 @@ class ModelViewer:
                     'params': sum(p.numel() for p in module.parameters()),
                     'trainable_params': sum(p.numel() for p in module.parameters() if p.requires_grad),
                     'input_shape': getattr(module, 'input_shape', 'Unknown'),
-                    'output_shape': getattr(module, 'output_shape', 'Unknown')
+                    'output_shape': getattr(module, 'output_shape', 'Unknown'),
+                    'kernel_size': str(getattr(module, 'kernel_size', '-')),
+                    'stride': str(getattr(module, 'stride', '-')),
+                    'padding': str(getattr(module, 'padding', '-')),
                 }
                 self.model_info['layers'].append(layer_info)
                 self.model_info['layer_count'] += 1
@@ -226,22 +229,30 @@ class ModelViewer:
             return
         
         # 创建层详情表格
-        table = Table(title="层详情信息")
+        table = Table(title="层详情信息", show_lines=True)
         table.add_column("层名称", style="cyan", no_wrap=True)
         table.add_column("类型", style="magenta")
+        table.add_column("Kernel", style="dim")
+        table.add_column("Stride", style="dim")
+        table.add_column("Padding", style="dim")
         table.add_column("输入形状", style="blue")
         table.add_column("输出形状", style="blue")
-        table.add_column("参数数量", style="yellow", justify="right")
-        table.add_column("可训练参数", style="green", justify="right")
+        table.add_column("参数", style="yellow", justify="right")
         
         for layer in self.model_info['layers']:
+            # 格式化形状字符串，如果太长就换行或者截断
+            in_shape = str(layer.get('input_shape', 'Unknown'))
+            out_shape = str(layer.get('output_shape', 'Unknown'))
+            
             table.add_row(
                 layer['name'],
                 layer['type'],
-                str(layer.get('input_shape', 'Unknown')),
-                str(layer.get('output_shape', 'Unknown')),
-                f"{layer['params']:,}",
-                f"{layer['trainable_params']:,}"
+                layer.get('kernel_size', '-'),
+                layer.get('stride', '-'),
+                layer.get('padding', '-'),
+                in_shape,
+                out_shape,
+                f"{layer['params']:,}"
             )
         
         self.console.print(table)
