@@ -209,3 +209,57 @@ Let me reevaluate and take a different approach.
 pip install ultralytics
 ```
 安装后，我们的模型查看器就可以正常加载和分析它了。
+
+
+# 如何将一个模型从动态图转换为静态图？
+
+在 PyTorch 中，将模型从**动态图（Eager Mode）**转换为**静态图（Graph Mode）**的过程通常称为 **TorchScript** 化。
+
+主要有两种方法：
+
+### 1. Tracing (追踪) —— `torch.jit.trace`
+这是最简单、最常用的方法。它的原理和我们刚才做的 `trace_model_shapes` 非常像：**给模型喂一个样本输入，记录下所有执行过的操作路径。**
+
+*   **适用场景**：模型结构固定，没有根据输入数据内容改变控制流（如 `if x.sum() > 0:`）。
+*   **代码示例**：
+    ```python
+    import torch
+
+    # 1. 准备模型和示例输入
+    model = MyModel().eval()
+    example_input = torch.randn(1, 3, 224, 224)
+
+    # 2. 进行追踪
+    traced_model = torch.jit.trace(model, example_input)
+
+    # 3. 保存静态图模型
+    traced_model.save("model_static.pt")
+    ```
+
+### 2. Scripting (脚本化) —— `torch.jit.script`
+如果你的模型包含复杂的控制流（如循环、条件判断取决于输入值），Tracing 可能会记录错误的路径（只记录了那一次运行走的路径）。这时需要用 Scripting。它会直接**解析 Python 源代码**并编译成中间表示。
+
+*   **适用场景**：模型包含复杂的 Python 逻辑（if-else, loop）。
+*   **代码示例**：
+    ```python
+    # 直接转换，不需要输入数据
+    scripted_model = torch.jit.script(model)
+    scripted_model.save("model_scripted.pt")
+    ```
+
+### 3. ONNX 导出 —— `torch.onnx.export`
+如果你是想把模型转换成静态图以便在其他推理引擎（如 TensorRT, OpenVINO, ONNX Runtime）上运行，通常会导出为 ONNX 格式。这也是一种静态图表示。
+
+```python
+torch.onnx.export(model,               # 模型
+                  example_input,       # 示例输入
+                  "model.onnx",        # 输出文件名
+                  opset_version=11,    # ONNX 版本
+                  input_names=['input'],
+                  output_names=['output'])
+```
+
+### 总结
+*   **最常用**：`torch.jit.trace`（简单，涵盖90%场景）。
+*   **最通用**：`torch.onnx.export`（用于跨平台部署）。
+*   **最硬核**：`torch.jit.script`（处理复杂逻辑）。
