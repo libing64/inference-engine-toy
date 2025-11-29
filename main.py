@@ -23,7 +23,7 @@ from inference_engine import InferenceEngine
 
 # 导入示例模型类
 try:
-    from examples import SimpleCNN, SimpleMLP, SimpleResNet
+    from examples import SimpleCNN, SimpleMLP, SimpleResNet, BasicBlock
 except ImportError:
     # 如果导入失败，定义一个简单的模型类
     class SimpleCNN(nn.Module):
