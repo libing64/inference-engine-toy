@@ -156,6 +156,69 @@ class ModelViewer:
         add_module_to_tree(self.model, tree)
         self.console.print(tree)
     
+    def trace_model_shapes(self, input_shape: Tuple[int, ...]):
+        """
+        通过一次前向传播来追踪每一层的输入输出形状
+        
+        Args:
+            input_shape: 输入数据的形状 (例如: (1, 3, 224, 224))
+        """
+        if self.model is None:
+            self.console.print("[red]错误: 没有加载模型[/red]")
+            return
+            
+        self.console.print(f"[yellow]正在追踪模型形状，输入形状: {input_shape}...[/yellow]")
+        
+        # 注册hook来捕获形状
+        hooks = []
+        layer_shapes = {}
+        
+        def get_shape_hook(name):
+            def hook(module, input, output):
+                input_shape = tuple(input[0].shape) if input else None
+                output_shape = tuple(output.shape) if isinstance(output, torch.Tensor) else None
+                layer_shapes[name] = {
+                    'input_shape': str(input_shape),
+                    'output_shape': str(output_shape)
+                }
+            return hook
+            
+        try:
+            # 为每个模块注册hook
+            for name, module in self.model.named_modules():
+                if name:  # 跳过根模块
+                    hooks.append(module.register_forward_hook(get_shape_hook(name)))
+            
+            # 创建虚拟输入并运行前向传播
+            device = next(self.model.parameters()).device
+            dummy_input = torch.zeros(input_shape).to(device)
+            
+            # 切换到评估模式
+            training = self.model.training
+            self.model.eval()
+            
+            with torch.no_grad():
+                self.model(dummy_input)
+                
+            # 恢复训练模式
+            self.model.train(training)
+            
+            # 更新model_info中的形状信息
+            for layer in self.model_info.get('layers', []):
+                name = layer['name']
+                if name in layer_shapes:
+                    layer['input_shape'] = layer_shapes[name]['input_shape']
+                    layer['output_shape'] = layer_shapes[name]['output_shape']
+            
+            self.console.print("[green]✓ 成功捕获模型形状信息[/green]")
+            
+        except Exception as e:
+            self.console.print(f"[red]追踪模型形状时出错: {str(e)}[/red]")
+        finally:
+            # 移除所有hooks
+            for hook in hooks:
+                hook.remove()
+
     def display_layer_details(self):
         """显示详细的层信息"""
         if not self.model_info.get('layers'):
@@ -166,6 +229,8 @@ class ModelViewer:
         table = Table(title="层详情信息")
         table.add_column("层名称", style="cyan", no_wrap=True)
         table.add_column("类型", style="magenta")
+        table.add_column("输入形状", style="blue")
+        table.add_column("输出形状", style="blue")
         table.add_column("参数数量", style="yellow", justify="right")
         table.add_column("可训练参数", style="green", justify="right")
         
@@ -173,6 +238,8 @@ class ModelViewer:
             table.add_row(
                 layer['name'],
                 layer['type'],
+                str(layer.get('input_shape', 'Unknown')),
+                str(layer.get('output_shape', 'Unknown')),
                 f"{layer['params']:,}",
                 f"{layer['trainable_params']:,}"
             )

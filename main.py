@@ -85,12 +85,13 @@ class ModelAnalyzer:
             self.console.print("2. 📊 查看模型信息")
             self.console.print("3. 🏗️  查看模型架构")
             self.console.print("4. 📋 查看层详情")
-            self.console.print("5. ⚡ 模型推理")
-            self.console.print("6. 🏃 性能测试")
-            self.console.print("7. 💾 导出信息")
+            self.console.print("5. 📏 追踪模型形状")
+            self.console.print("6. ⚡ 模型推理")
+            self.console.print("7. 🏃 性能测试")
+            self.console.print("8. 💾 导出信息")
             self.console.print("0. 👋 退出程序")
             
-            choice = Prompt.ask("请输入选择", choices=["0", "1", "2", "3", "4", "5", "6", "7"])
+            choice = Prompt.ask("请输入选择", choices=["0", "1", "2", "3", "4", "5", "6", "7", "8"])
             
             try:
                 if choice == "0":
@@ -105,10 +106,12 @@ class ModelAnalyzer:
                 elif choice == "4":
                     self._handle_layer_details()
                 elif choice == "5":
-                    self._handle_inference()
+                    self._handle_trace_shapes()
                 elif choice == "6":
-                    self._handle_benchmark()
+                    self._handle_inference()
                 elif choice == "7":
+                    self._handle_benchmark()
+                elif choice == "8":
                     self._handle_export()
                     
             except KeyboardInterrupt:
@@ -160,13 +163,40 @@ class ModelAnalyzer:
             self.console.print("[yellow]只有权重信息，无法显示完整架构[/yellow]")
             self.viewer.display_state_dict_info()
     
+    def _ensure_shape_info(self):
+        """确保模型包含形状信息"""
+        # 检查是否已经有形状信息（通过检查第一层的input_shape是否为Unknown）
+        if self.viewer.model_info.get('layers') and \
+           self.viewer.model_info['layers'][0].get('input_shape') == 'Unknown':
+            
+            if Confirm.ask("模型缺少输入输出形状信息，是否现在进行追踪?", default=True):
+                try:
+                    input_shape = Prompt.ask("请输入输入数据形状 (例如: 1,3,224,224)")
+                    shape_list = [int(x.strip()) for x in input_shape.split(',')]
+                    self.viewer.trace_model_shapes(tuple(shape_list))
+                except ValueError:
+                    self.console.print("[red]输入格式无效，跳过形状追踪[/red]")
+
     def _handle_layer_details(self):
         """处理层详情显示"""
         if not self._check_model_loaded():
             return
-        
+            
+        self._ensure_shape_info()
         self.viewer.display_layer_details()
-    
+
+    def _handle_trace_shapes(self):
+        """处理模型形状追踪"""
+        if not self._check_model_loaded():
+            return
+            
+        try:
+            input_shape = Prompt.ask("请输入输入数据形状 (例如: 1,3,224,224)")
+            shape_list = [int(x.strip()) for x in input_shape.split(',')]
+            self.viewer.trace_model_shapes(tuple(shape_list))
+        except ValueError:
+            self.console.print("[red]输入格式无效[/red]")
+
     def _handle_inference(self):
         """处理模型推理"""
         if not self._check_inference_ready():
@@ -221,6 +251,7 @@ class ModelAnalyzer:
         if not self._check_model_loaded():
             return
         
+        self._ensure_shape_info()
         output_path = Prompt.ask("请输入导出文件路径", default="model_info.json")
         self.viewer.export_model_info(output_path)
     
