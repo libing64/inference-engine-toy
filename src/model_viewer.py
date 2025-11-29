@@ -15,7 +15,7 @@ import os
 
 
 class ModelViewer:
-    """简易模型查看器，用于加载.pth格式的模型文件并显示模型结构"""
+    """简易模型查看器，用于加载.pth/.pt格式的模型文件并显示模型结构"""
     
     def __init__(self):
         self.console = Console()
@@ -24,7 +24,7 @@ class ModelViewer:
     
     def load_model(self, model_path: str, map_location: str = 'cpu') -> bool:
         """
-        加载.pth格式的模型文件
+        加载.pth或.pt格式的模型文件
         
         Args:
             model_path: 模型文件路径

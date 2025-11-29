@@ -81,7 +81,7 @@ class ModelAnalyzer:
         while True:
             self.console.print("\n" + "="*50)
             self.console.print("[bold yellow]请选择操作:[/bold yellow]")
-            self.console.print("1. 🔍 加载模型")
+            self.console.print("1. 🔍 加载模型 (.pth/.pt)")
             self.console.print("2. 📊 查看模型信息")
             self.console.print("3. 🏗️  查看模型架构")
             self.console.print("4. 📋 查看层详情")
@@ -121,7 +121,7 @@ class ModelAnalyzer:
     
     def _handle_load_model(self):
         """处理模型加载"""
-        model_path = Prompt.ask("请输入模型文件路径 (.pth)")
+        model_path = Prompt.ask("请输入模型文件路径 (.pth 或 .pt)")
         
         if not os.path.exists(model_path):
             self.console.print("[red]文件不存在![/red]")

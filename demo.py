@@ -109,7 +109,7 @@ def main():
     
     console.print("\n[bold green]🎉 演示完成![/bold green]")
     console.print("\n[cyan]💡 使用提示:[/cyan]")
-    console.print("• 本项目支持加载.pth格式的模型文件")
+    console.print("• 本项目支持加载.pth/.pt格式的模型文件")
     console.print("• 运行 'python3 main.py --interactive' 进入交互模式")
     console.print("• 推理引擎优先考虑可读性，显示详细的执行过程")
 
