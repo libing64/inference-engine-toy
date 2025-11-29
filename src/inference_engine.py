@@ -90,14 +90,57 @@ class InferenceEngine:
         
         start_time = time.time()
         
-        # 执行推理
-        with torch.no_grad():
-            current_output = input_data
-            
-            # 逐层执行推理
+        # 注册hooks
+        hooks = []
+        
+        def get_layer_hook(name, layer):
+            def hook(module, input, output):
+                # 记录时间（估算）
+                execution_time = 0.0 # hook中很难准确测量计算时间，因为是异步的
+                
+                input_shape = tuple(input[0].shape) if input else None
+                output_shape = tuple(output.shape) if isinstance(output, torch.Tensor) else None
+                
+                # 获取参数信息
+                parameters = self._get_layer_parameters(module)
+                
+                step = InferenceStep(
+                    layer_name=name,
+                    operation=module.__class__.__name__,
+                    input_shape=input_shape,
+                    output_shape=output_shape,
+                    execution_time=execution_time, # 暂时设为0
+                    parameters=parameters
+                )
+                self.inference_steps.append(step)
+                
+                # 保存中间输出
+                if self.track_intermediate and isinstance(output, torch.Tensor):
+                    self.intermediate_outputs[name] = output.detach().clone()
+                
+                # 实时显示（如果在verbose模式）
+                if self.verbose:
+                    self._display_step_info(step)
+                    
+            return hook
+
+        try:
+            # 只为叶子节点注册hook，避免重复记录
             for name, layer in self.model.named_modules():
-                if name:  # 跳过根模块
-                    current_output = self._execute_layer(name, layer, current_output)
+                if name and len(list(layer.children())) == 0:  # 是叶子节点
+                    hooks.append(layer.register_forward_hook(get_layer_hook(name, layer)))
+            
+            # 执行推理
+            with torch.no_grad():
+                current_output = self.model(input_data)
+                
+        except Exception as e:
+            self.console.print(f"[red]推理过程出错: {str(e)}[/red]")
+            raise e
+        finally:
+            # 移除所有hooks
+            for hook in hooks:
+                hook.remove()
         
         total_time = time.time() - start_time
         
@@ -105,55 +148,11 @@ class InferenceEngine:
             self._display_inference_summary(total_time)
         
         return current_output
-    
+
     def _execute_layer(self, layer_name: str, layer: nn.Module, input_tensor: torch.Tensor) -> torch.Tensor:
-        """执行单个层的推理"""
-        layer_type = layer.__class__.__name__
-        
-        # 记录输入形状
-        input_shape = tuple(input_tensor.shape)
-        
-        # 执行推理
-        step_start_time = time.time()
-        
-        try:
-            if layer_type in self.operation_handlers:
-                output_tensor = self.operation_handlers[layer_type](layer, input_tensor)
-            else:
-                # 使用默认的forward方法
-                output_tensor = layer(input_tensor)
-                if self.verbose:
-                    self.console.print(f"[yellow]警告: 使用默认forward方法处理 {layer_type}[/yellow]")
-            
-        except Exception as e:
-            self.console.print(f"[red]执行层 {layer_name} ({layer_type}) 时出错: {str(e)}[/red]")
-            raise e
-        
-        execution_time = time.time() - step_start_time
-        output_shape = tuple(output_tensor.shape)
-        
-        # 记录推理步骤
-        parameters = self._get_layer_parameters(layer)
-        step = InferenceStep(
-            layer_name=layer_name,
-            operation=layer_type,
-            input_shape=input_shape,
-            output_shape=output_shape,
-            execution_time=execution_time,
-            parameters=parameters
-        )
-        
-        self.inference_steps.append(step)
-        
-        # 保存中间输出（如果启用）
-        if self.track_intermediate:
-            self.intermediate_outputs[layer_name] = output_tensor.clone()
-        
-        # 显示实时推理信息
-        if self.verbose:
-            self._display_step_info(step)
-        
-        return output_tensor
+        """(已弃用) 执行单个层的推理"""
+        # 保留此方法以兼容旧代码，但不再主要使用
+        return layer(input_tensor)
     
     def _get_layer_parameters(self, layer: nn.Module) -> Dict:
         """获取层的参数信息"""
