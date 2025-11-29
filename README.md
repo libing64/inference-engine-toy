@@ -71,6 +71,11 @@ python3 examples.py --test-viewer
 python3 examples.py --test-engine
 ```
 
+测试web图形界面
+```
+streamlit run web_app.py
+```
+
 ## 📖 使用示例
 
 ### 基本用法
