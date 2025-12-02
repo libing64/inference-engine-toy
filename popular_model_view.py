@@ -19,6 +19,18 @@ from torchvista import trace_model
 class PopularModelViewer:
     """经典模型查看器，支持可视化并导出为SVG格式"""
     
+    # 经典模型的默认输入尺寸映射 (batch, channels, height, width)
+    MODEL_INPUT_SIZES = {
+        'resnet18': (1, 3, 224, 224),
+        'resnet50': (1, 3, 224, 224),
+        'vgg16': (1, 3, 224, 224),
+        'vgg19': (1, 3, 224, 224),
+        'alexnet': (1, 3, 224, 224),  # PyTorch torchvision 使用 224x224
+        'mobilenet_v2': (1, 3, 224, 224),
+        'densenet121': (1, 3, 224, 224),
+        'googlenet': (1, 3, 224, 224),
+    }
+    
     def __init__(self, output_dir: str = "model_visualizations"):
         """
         初始化模型查看器
@@ -29,6 +41,18 @@ class PopularModelViewer:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
         self.models = {}
+    
+    def get_model_input_size(self, model_name: str) -> Tuple[int, ...]:
+        """
+        获取模型的默认输入尺寸
+        
+        Args:
+            model_name: 模型名称
+            
+        Returns:
+            输入尺寸元组 (batch, channels, height, width)
+        """
+        return self.MODEL_INPUT_SIZES.get(model_name, (1, 3, 224, 224))
         
     def load_resnet18(self, pretrained: bool = False) -> nn.Module:
         """加载ResNet18模型"""
@@ -143,7 +167,7 @@ class PopularModelViewer:
         self, 
         model: nn.Module, 
         model_name: str,
-        input_shape: Tuple[int, ...] = (1, 3, 224, 224),
+        input_shape: Optional[Tuple[int, ...]] = None,
         simplify: bool = True
     ) -> Optional[str]:
         """
@@ -152,7 +176,7 @@ class PopularModelViewer:
         Args:
             model: PyTorch模型
             model_name: 模型名称（用于文件名）
-            input_shape: 输入形状，默认 (1, 3, 224, 224)
+            input_shape: 输入形状，如果为None则使用模型默认尺寸
             simplify: 是否简化图形（减少节点数量）
             
         Returns:
@@ -161,12 +185,21 @@ class PopularModelViewer:
         print(f"\n正在可视化模型: {model_name}...")
         
         try:
+            # 如果没有指定输入尺寸，使用模型默认尺寸
+            if input_shape is None:
+                input_shape = self.get_model_input_size(model_name)
+                print(f"  使用默认输入尺寸: {input_shape}")
+            else:
+                print(f"  使用指定输入尺寸: {input_shape}")
+            
             # 创建虚拟输入
+            # input shape: (batch, channels, height, width)
+            # With the use of forced_module_tracing_depth, you can now explore what happens inside TransformerEncoderLayer, MultiHeadAttention, etc
+            # trace_model(model, example_input, forced_module_tracing_depth=3, collapse_modules_after_depth=1, show_non_gradient_nodes=False, export_format='png')
+            print(f"input_shape: {input_shape}")
             dummy_input = torch.randn(input_shape)
-            trace = trace_model(model, dummy_input)
-            svg_path = os.path.join(self.output_dir, f"{model_name}.svg")
-            trace.save(svg_path)
-            return svg_path
+            trace_model(model, dummy_input, forced_module_tracing_depth=3, collapse_modules_after_depth=1, show_non_gradient_nodes=False, export_format='png')
+            return
         except Exception as e:
             print(f"可视化模型 {model_name} 失败: {e}")
             return None
@@ -311,17 +344,29 @@ class PopularModelViewer:
         
         return svg_path
     
-    def visualize_all_models(self, input_shape: Tuple[int, ...] = (1, 3, 224, 224)):
-        """可视化所有已加载的模型"""
+    def visualize_all_models(self, input_shape: Optional[Tuple[int, ...]] = None):
+        """
+        可视化所有已加载的模型
+        
+        Args:
+            input_shape: 输入形状，如果为None则每个模型使用其默认尺寸
+        """
         print(f"\n开始可视化 {len(self.models)} 个模型...")
         print(f"输出目录: {self.output_dir}")
         
+        if input_shape is None:
+            print("使用每个模型的默认输入尺寸")
+        else:
+            print(f"所有模型使用统一输入尺寸: {input_shape}")
+        
         results = {}
         for model_name, model in self.models.items():
+            # 如果指定了统一的输入尺寸，使用它；否则使用模型默认尺寸
+            model_input_shape = input_shape if input_shape is not None else None
             svg_path = self.visualize_model_to_svg(
                 model, 
                 model_name, 
-                input_shape=input_shape
+                input_shape=model_input_shape
             )
             results[model_name] = svg_path
         
@@ -361,13 +406,22 @@ def main():
     parser.add_argument('--output-dir', type=str, default='model_visualizations',
                        help='输出目录')
     parser.add_argument('--input-shape', type=int, nargs=4, 
-                       default=[1, 3, 224, 224],
-                       help='输入形状 (batch, channels, height, width)')
+                       default=None,
+                       help='输入形状 (batch, channels, height, width)，如果不指定则使用每个模型的默认尺寸')
     
     args = parser.parse_args()
     
     # 创建查看器
     viewer = PopularModelViewer(output_dir=args.output_dir)
+    
+    # 打印模型输入尺寸信息
+    print("=" * 60)
+    print("经典模型的默认输入尺寸:")
+    print("=" * 60)
+    for model_name, size in viewer.MODEL_INPUT_SIZES.items():
+        print(f"  {model_name:15s}: {size}")
+    print("=" * 60)
+    print()
     
     # 加载模型
     if 'all' in args.models:
@@ -395,7 +449,7 @@ def main():
                 print(f"加载 {model_name} 失败: {e}")
     
     # 可视化所有模型
-    input_shape = tuple(args.input_shape)
+    input_shape = tuple(args.input_shape) if args.input_shape else None
     results = viewer.visualize_all_models(input_shape=input_shape)
     
     # 打印结果
