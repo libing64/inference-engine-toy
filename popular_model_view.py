@@ -10,20 +10,10 @@ import torchvision.models as models
 from typing import Optional, List, Tuple
 import os
 import sys
+from torchvista import trace_model
 
-try:
-    from torchviz import make_dot
-    TORCHVIZ_AVAILABLE = True
-except ImportError:
-    TORCHVIZ_AVAILABLE = False
-    print("警告: torchviz 未安装，将使用替代方法")
 
-try:
-    import graphviz
-    GRAPHVIZ_AVAILABLE = True
-except ImportError:
-    GRAPHVIZ_AVAILABLE = False
-    print("警告: graphviz 未安装，将使用替代方法")
+
 
 
 class PopularModelViewer:
@@ -173,61 +163,14 @@ class PopularModelViewer:
         try:
             # 创建虚拟输入
             dummy_input = torch.randn(input_shape)
-            
-            # 方法1: 使用torchviz（如果可用）
-            if TORCHVIZ_AVAILABLE:
-                try:
-                    # 运行一次前向传播
-                    model.eval()
-                    with torch.no_grad():
-                        output = model(dummy_input)
-                    
-                    # 创建计算图
-                    dot = make_dot(output, params=dict(list(model.named_parameters())))
-                    
-                    # 保存为SVG
-                    svg_path = os.path.join(self.output_dir, f"{model_name}.svg")
-                    dot.render(
-                        filename=os.path.join(self.output_dir, model_name),
-                        format='svg',
-                        cleanup=True
-                    )
-                    
-                    print(f"✓ 已生成SVG: {svg_path}")
-                    return svg_path
-                    
-                except Exception as e:
-                    print(f"使用torchviz失败: {e}，尝试替代方法...")
-            
-            # 方法2: 使用torch.jit.trace + 手动生成SVG
-            try:
-                model.eval()
-                traced_model = torch.jit.trace(model, dummy_input)
-                
-                # 获取计算图
-                graph = traced_model.graph
-                
-                # 生成简单的SVG可视化
-                svg_path = self._generate_simple_svg(graph, model_name)
-                print(f"✓ 已生成SVG: {svg_path}")
-                return svg_path
-                
-            except Exception as e:
-                print(f"使用torch.jit.trace失败: {e}")
-            
-            # 方法3: 生成文本格式的模型结构
-            svg_path = self._generate_text_based_svg(model, model_name)
-            if svg_path:
-                print(f"✓ 已生成文本格式SVG: {svg_path}")
-                return svg_path
-            
-            return None
-            
+            trace = trace_model(model, dummy_input)
+            svg_path = os.path.join(self.output_dir, f"{model_name}.svg")
+            trace.save(svg_path)
+            return svg_path
         except Exception as e:
-            print(f"可视化模型 {model_name} 时出错: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"可视化模型 {model_name} 失败: {e}")
             return None
+            
     
     def _generate_simple_svg(self, graph, model_name: str) -> str:
         """生成简单的SVG可视化（基于torch.jit.graph）"""
