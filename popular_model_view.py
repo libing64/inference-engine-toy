@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-经典模型可视化工具 - 使用torch查看经典模型并输出SVG格式
-Popular Model Viewer - View classic models using torch and export to SVG format
+经典模型可视化工具 - 使用torch查看经典模型并输出HTML格式
+Popular Model Viewer - View classic models using torch and export to HTML format
 """
 
 import torch
@@ -17,7 +17,7 @@ from torchvista import trace_model
 
 
 class PopularModelViewer:
-    """经典模型查看器，支持可视化并导出为SVG格式"""
+    """经典模型查看器，支持可视化并导出为HTML格式"""
     
     # 经典模型的默认输入尺寸映射 (batch, channels, height, width)
     MODEL_INPUT_SIZES = {
@@ -163,7 +163,7 @@ class PopularModelViewer:
         
         print(f"\n✓ 成功加载 {len(self.models)} 个模型")
     
-    def visualize_model_to_svg(
+    def visualize_model_to_html(
         self, 
         model: nn.Module, 
         model_name: str,
@@ -171,7 +171,7 @@ class PopularModelViewer:
         simplify: bool = True
     ) -> Optional[str]:
         """
-        将模型可视化并导出为SVG格式
+        将模型可视化并导出为HTML格式
         
         Args:
             model: PyTorch模型
@@ -180,7 +180,7 @@ class PopularModelViewer:
             simplify: 是否简化图形（减少节点数量）
             
         Returns:
-            SVG文件路径，如果失败则返回None
+            HTML文件路径，如果失败则返回None
         """
         print(f"\n正在可视化模型: {model_name}...")
         
@@ -236,14 +236,14 @@ class PopularModelViewer:
         for model_name, model in self.models.items():
             # 如果指定了统一的输入尺寸，使用它；否则使用模型默认尺寸
             model_input_shape = input_shape if input_shape is not None else None
-            svg_path = self.visualize_model_to_svg(
+            html_path = self.visualize_model_to_html(
                 model, 
                 model_name, 
                 input_shape=model_input_shape
             )
-            results[model_name] = svg_path
+            results[model_name] = html_path
         
-        print(f"\n✓ 完成！已生成 {sum(1 for v in results.values() if v)} 个SVG文件")
+        print(f"\n✓ 完成！已生成 {sum(1 for v in results.values() if v)} 个HTML文件")
         return results
     
     def get_model_info(self, model_name: str) -> dict:
