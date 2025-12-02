@@ -194,155 +194,28 @@ class PopularModelViewer:
             
             # 创建虚拟输入
             # input shape: (batch, channels, height, width)
-            # With the use of forced_module_tracing_depth, you can now explore what happens inside TransformerEncoderLayer, MultiHeadAttention, etc
-            # trace_model(model, example_input, forced_module_tracing_depth=3, collapse_modules_after_depth=1, show_non_gradient_nodes=False, export_format='png')
             print(f"input_shape: {input_shape}")
             dummy_input = torch.randn(input_shape)
-            trace_model(model, dummy_input, forced_module_tracing_depth=3, collapse_modules_after_depth=1, show_non_gradient_nodes=False, export_format='png')
+            
+            # 使用torchvista的trace_model追踪模型
+            # forced_module_tracing_depth: 强制追踪模块的深度
+            # collapse_modules_after_depth: 在指定深度后折叠模块
+            # show_non_gradient_nodes: 是否显示非梯度节点
+            # export_format: 导出格式 ('svg', 'png', 'html'等)
+            trace_model(
+                model, 
+                dummy_input, 
+                forced_module_tracing_depth=3, 
+                collapse_modules_after_depth=1, 
+                show_non_gradient_nodes=False, 
+                export_format='html'
+            )
             return
         except Exception as e:
             print(f"可视化模型 {model_name} 失败: {e}")
             return None
             
     
-    def _generate_simple_svg(self, graph, model_name: str) -> str:
-        """生成简单的SVG可视化（基于torch.jit.graph）"""
-        svg_path = os.path.join(self.output_dir, f"{model_name}.svg")
-        
-        # 收集节点信息
-        nodes = []
-        edges = []
-        node_id = 0
-        node_map = {}
-        
-        for node in graph.nodes():
-            node_name = node.kind()
-            node_id_str = f"node_{node_id}"
-            node_map[node] = node_id_str
-            nodes.append((node_id_str, node_name))
-            node_id += 1
-            
-            # 添加边
-            for input_node in node.inputs():
-                if input_node.node() in node_map:
-                    edges.append((node_map[input_node.node()], node_id_str))
-        
-        # 生成SVG
-        svg_content = self._create_svg_from_graph(nodes, edges, model_name)
-        
-        with open(svg_path, 'w', encoding='utf-8') as f:
-            f.write(svg_content)
-        
-        return svg_path
-    
-    def _create_svg_from_graph(self, nodes: List[Tuple[str, str]], edges: List[Tuple[str, str]], title: str) -> str:
-        """从节点和边创建SVG内容"""
-        # 简单的SVG布局（水平排列）
-        node_width = 120
-        node_height = 60
-        spacing = 150
-        start_x = 50
-        start_y = 100
-        
-        svg_width = max(800, len(nodes) * spacing + 200)
-        svg_height = 400
-        
-        svg = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      .node {{ fill: #e1f5ff; stroke: #01579b; stroke-width: 2; }}
-      .edge {{ stroke: #666; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }}
-      .label {{ font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }}
-      .title {{ font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; text-anchor: middle; }}
-    </style>
-    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#666" />
-    </marker>
-  </defs>
-  
-  <text x="{svg_width // 2}" y="30" class="title">{title}</text>
-  
-'''
-        
-        # 添加节点
-        for i, (node_id, node_name) in enumerate(nodes):
-            x = start_x + i * spacing
-            y = start_y
-            # 截断过长的节点名
-            display_name = node_name[:15] + "..." if len(node_name) > 15 else node_name
-            svg += f'  <rect x="{x - node_width//2}" y="{y - node_height//2}" width="{node_width}" height="{node_height}" class="node" rx="5"/>\n'
-            svg += f'  <text x="{x}" y="{y + 5}" class="label">{display_name}</text>\n'
-        
-        # 添加边
-        for i, (source, target) in enumerate(edges):
-            try:
-                source_idx = next(j for j, (nid, _) in enumerate(nodes) if nid == source)
-                target_idx = next(j for j, (nid, _) in enumerate(nodes) if nid == target)
-                
-                x1 = start_x + source_idx * spacing
-                y1 = start_y + node_height // 2
-                x2 = start_x + target_idx * spacing
-                y2 = start_y - node_height // 2
-                
-                svg += f'  <line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" class="edge"/>\n'
-            except:
-                pass
-        
-        svg += '</svg>'
-        return svg
-    
-    def _generate_text_based_svg(self, model: nn.Module, model_name: str) -> str:
-        """生成基于文本的模型结构SVG"""
-        svg_path = os.path.join(self.output_dir, f"{model_name}.svg")
-        
-        # 收集模型结构信息
-        layers = []
-        for name, module in model.named_modules():
-            if name:  # 跳过根模块
-                layers.append((name, module.__class__.__name__))
-        
-        # 生成SVG
-        svg_width = 800
-        svg_height = max(400, len(layers) * 30 + 100)
-        
-        svg = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      .title {{ font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; text-anchor: middle; fill: #01579b; }}
-      .layer-name {{ font-family: 'Courier New', monospace; font-size: 12px; fill: #333; }}
-      .layer-type {{ font-family: Arial, sans-serif; font-size: 11px; fill: #666; }}
-      .box {{ fill: #f5f5f5; stroke: #ddd; stroke-width: 1; }}
-    </style>
-  </defs>
-  
-  <text x="{svg_width // 2}" y="30" class="title">{model_name} - Model Architecture</text>
-  
-'''
-        
-        start_y = 70
-        y_spacing = 25
-        
-        for i, (layer_name, layer_type) in enumerate(layers[:50]):  # 限制显示前50层
-            y = start_y + i * y_spacing
-            # 绘制背景框
-            svg += f'  <rect x="20" y="{y - 15}" width="{svg_width - 40}" height="20" class="box" rx="3"/>\n'
-            # 绘制层名
-            display_name = layer_name[:60] + "..." if len(layer_name) > 60 else layer_name
-            svg += f'  <text x="30" y="{y}" class="layer-name">{display_name}</text>\n'
-            # 绘制层类型
-            svg += f'  <text x="{svg_width - 150}" y="{y}" class="layer-type">{layer_type}</text>\n'
-        
-        if len(layers) > 50:
-            svg += f'  <text x="{svg_width // 2}" y="{start_y + 50 * y_spacing + 20}" class="layer-type">... 还有 {len(layers) - 50} 层未显示</text>\n'
-        
-        svg += '</svg>'
-        
-        with open(svg_path, 'w', encoding='utf-8') as f:
-            f.write(svg)
-        
-        return svg_path
     
     def visualize_all_models(self, input_shape: Optional[Tuple[int, ...]] = None):
         """
@@ -453,10 +326,10 @@ def main():
     results = viewer.visualize_all_models(input_shape=input_shape)
     
     # 打印结果
-    print("\n生成的SVG文件:")
-    for model_name, svg_path in results.items():
-        if svg_path:
-            print(f"  ✓ {model_name}: {svg_path}")
+    print("\n生成的HTML文件:")
+    for model_name, html_path in results.items():
+        if html_path:
+            print(f"  ✓ {model_name}: {html_path}")
         else:
             print(f"  ✗ {model_name}: 生成失败")
 
